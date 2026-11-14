@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#4b211c">
+  <title>Admin Undangan — Eva &amp; Riko</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --mahogany: #4b211c;
+      --mahogany-dark: #311511;
+      --gold: #bd9855;
+      --paper: #f7f3eb;
+      --white: #fffefa;
+      --ink: #332a27;
+      --muted: #766960;
+      --red: #9c3333;
+      font-family: "DM Sans", "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; margin: 0; background: var(--paper); color: var(--ink); }
+    header { padding: 21px max(22px, calc((100% - 1040px) / 2)); background: var(--mahogany-dark); color: var(--white); }
+    header a { color: #ead9b5; font-size: 13px; text-decoration: none; }
+    main { width: min(100% - 32px, 900px); margin: 44px auto 70px; }
+    .eyebrow { color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    h1, h2 { color: var(--mahogany); font-family: Georgia, serif; font-weight: 500; }
+    h1 { margin: 7px 0 9px; font-size: clamp(32px, 6vw, 48px); }
+    h2 { margin: 0 0 15px; font-size: 25px; }
+    .intro { margin: 0 0 28px; color: var(--muted); line-height: 1.65; }
+    .card { margin: 0 0 20px; padding: clamp(20px, 5vw, 32px); border: 1px solid #e1d4bb; background: var(--white); box-shadow: 0 12px 32px rgba(49,21,17,.05); }
+    .setup { border-left: 4px solid var(--gold); }
+    .setup[hidden], .panel[hidden] { display: none; }
+    .setup ol { padding-left: 21px; color: var(--muted); line-height: 1.8; }
+    .setup code { padding: 2px 5px; background: #f0eadf; color: var(--mahogany); overflow-wrap: anywhere; }
+    .field { display: grid; gap: 7px; margin-bottom: 15px; }
+    label { color: var(--mahogany); font-size: 12px; font-weight: 700; }
+    input { width: 100%; min-height: 46px; padding: 11px 12px; border: 1px solid #dcd1c2; border-radius: 0; background: var(--white); color: var(--ink); font: inherit; }
+    input:focus { outline: 2px solid rgba(189,152,85,.5); outline-offset: 1px; }
+    button { min-height: 44px; padding: 0 17px; border: 0; background: var(--mahogany); color: var(--white); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+    button:hover { background: var(--mahogany-dark); }
+    button:disabled { cursor: wait; opacity: .6; }
+    .secondary { border: 1px solid #d5c6ae; background: transparent; color: var(--mahogany); }
+    .secondary:hover { background: #f6f0e5; }
+    .danger { min-height: 38px; border: 1px solid #e5c4c0; background: #fff5f3; color: var(--red); }
+    .danger:hover { background: #fce8e5; }
+    .status { min-height: 20px; margin: 13px 0 0; color: #426342; font-size: 13px; line-height: 1.5; }
+    .status.error { color: var(--red); }
+    .card-heading, .comment-top, .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-heading { margin-bottom: 17px; }
+    .card-heading h2 { margin: 0; }
+    .invite-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+    .invite-form .field { margin: 0; }
+    .invite-output { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 15px; }
+    .comment-list { display: grid; gap: 12px; }
+    .comment { padding: 17px; border-left: 3px solid var(--gold); background: var(--paper); }
+    .comment-top { align-items: flex-start; }
+    .comment-name { color: var(--mahogany); font-family: Georgia, serif; font-size: 20px; font-weight: 700; }
+    .comment-body { margin: 10px 0; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .comment-meta { color: var(--muted); font-size: 12px; }
+    .empty { padding: 24px; background: var(--paper); color: var(--muted); text-align: center; }
+    .toolbar { margin: 0 0 18px; }
+    @media (max-width: 560px) {
+      main { margin-top: 27px; }
+      .invite-form, .invite-output { grid-template-columns: 1fr; }
+      .invite-form button, .invite-output button { width: 100%; }
+      .comment-top { flex-direction: column; }
+      .toolbar { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header><a href="index.html">← Kembali ke undangan</a></header>
+  <main>
+    <span class="eyebrow">Kelola undangan</span>
+    <h1>Admin Eva &amp; Riko</h1>
+    <p class="intro">Buat tautan undangan personal dan moderasi ucapan tamu.</p>
+
+    <section class="card setup" id="setup-panel" hidden>
+      <h2>Hubungkan Supabase</h2>
+      <p>Siapkan database bersama agar buku tamu bisa dikelola dari perangkat mana pun.</p>
+      <ol>
+        <li>Jalankan <code>supabase/schema.sql</code> di SQL Editor proyek Supabase.</li>
+        <li>Isi Project URL dan public anon/publishable key di <code>js/supabase-config.js</code>. Jangan pernah taruh service-role key di website.</li>
+        <li>Buat akun admin di Supabase Authentication dan matikan pendaftaran akun publik. Daftarkan email admin lewat SQL Editor:
+          <br><code>insert into public.wedding_admins(user_id) select id from auth.users where email = 'EMAIL_ADMIN' on conflict do nothing;</code>
+        </li>
+        <li>Publikasikan website melalui HTTPS. Kunci public aman digunakan karena aturan database membatasi penghapusan untuk admin.</li>
+      </ol>
+      <p class="status error" id="setup-status"></p>
+    </section>
+
+    <section class="card panel" id="login-panel" hidden>
+      <h2>Masuk sebagai admin</h2>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email admin</label>
+          <input id="email" name="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Kata sandi</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button id="login-button" type="submit">Masuk</button>
+      </form>
+      <p class="status" id="login-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <div class="panel" id="admin-panel" hidden>
+      <section class="card">
+        <h2>Buat link undangan</h2>
+        <form class="invite-form" id="invite-form">
+          <div class="field">
+            <label for="invite-names">Nama penerima (satu atau dua nama, pisahkan dengan koma)</label>
+            <input id="invite-names" name="invite-names" type="text" maxlength="245" placeholder="Madil, Istri" required>
+          </div>
+          <button type="submit">Buat link</button>
+        </form>
+        <div class="invite-output" id="invite-output" hidden>
+          <input id="invite-link" type="url" readonly aria-label="Link undangan personal">
+          <button class="secondary" id="copy-invite-link" type="button">Salin link</button>
+        </div>
+        <p class="status" id="invite-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card">
+        <div class="toolbar">
+          <div>
+            <h2>Ucapan tamu</h2>
+            <span class="comment-meta" id="comment-count"></span>
+          </div>
+          <div>
+            <button class="secondary" id="refresh-comments" type="button">Muat ulang</button>
+            <button class="secondary" id="logout-button" type="button">Keluar</button>
+          </div>
+        </div>
+        <p class="status" id="comments-status" role="status" aria-live="polite"></p>
+        <div class="comment-list" id="comment-list"></div>
+      </section>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script>
+    (() => {
+      const setupPanel = document.querySelector("#setup-panel");
+      const loginPanel = document.querySelector("#login-panel");
+      const adminPanel = document.querySelector("#admin-panel");
+      const loginStatus = document.querySelector("#login-status");
+      const commentsStatus = document.querySelector("#comments-status");
+      const commentList = document.querySelector("#comment-list");
+      const config = window.weddingSupabaseConfig;
+      const configured = config &&
+        /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.url) &&
+        typeof config.anonKey === "string" &&
+        config.anonKey.length > 20 &&
+        window.supabase?.createClient;
+
+      if (!configured) {
+        setupPanel.hidden = false;
+        document.querySelector("#setup-status").textContent =
+          "Supabase belum dikonfigurasi. Admin dan buku tamu belum dapat digunakan.";
+        return;
+      }
+
+      const client = window.supabase.createClient(config.url, config.anonKey);
+
+      function setStatus(element, message, isError = false) {
+        element.textContent = message;
+        element.classList.toggle("error", isError);
+      }
+
+      function showLogin(message = "") {
+        adminPanel.hidden = true;
+        loginPanel.hidden = false;
+        setStatus(loginStatus, message, Boolean(message));
+      }
+
+      function formatDate(value) {
+        return new Date(value).toLocaleString("id-ID", {
+          dateStyle: "medium",
+          timeStyle: "short"
+        });
+      }
+
+      function renderComments(comments) {
+        commentList.replaceChildren();
+        document.querySelector("#comment-count").textContent =
+          `${comments.length} ucapan`;
+        if (comments.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "Belum ada ucapan tamu.";
+          commentList.append(empty);
+          return;
+        }
+
+        comments.forEach((entry) => {
+          const card = document.createElement("article");
+          const top = document.createElement("div");
+          const identity = document.createElement("div");
+          const name = document.createElement("strong");
+          const attendance = document.createElement("div");
+          const message = document.createElement("p");
+          const date = document.createElement("time");
+          const remove = document.createElement("button");
+
+          card.className = "comment";
+          top.className = "comment-top";
+          name.className = "comment-name";
+          name.textContent = entry.name;
+          attendance.className = "comment-meta";
+          attendance.textContent = entry.attendance === "hadir"
+            ? "Insyaallah hadir"
+            : "Mohon maaf, tidak hadir";
+          identity.append(name, attendance);
+          message.className = "comment-body";
+          message.textContent = entry.comment;
+          date.className = "comment-meta";
+          date.dateTime = entry.created_at;
+          date.textContent = formatDate(entry.created_at);
+          remove.className = "danger";
+          remove.type = "button";
+          remove.textContent = "Hapus ucapan";
+          remove.addEventListener("click", () => deleteComment(entry.id, remove));
+          top.append(identity, remove);
+          card.append(top, message, date);
+          commentList.append(card);
+        });
+      }
+
+      async function loadComments() {
+        setStatus(commentsStatus, "Memuat ucapan…");
+        try {
+          const { data, error } = await client
+            .from("wedding_comments")
+            .select("id, name, comment, attendance, created_at")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          renderComments(data);
+          setStatus(commentsStatus, "");
+        } catch (error) {
+          setStatus(commentsStatus, "Ucapan gagal dimuat. Periksa koneksi dan izin database.", true);
+          console.error("Gagal memuat ucapan untuk admin.", error);
+        }
+      }
+
+      async function deleteComment(id, button) {
+        if (!window.confirm("Hapus ucapan ini secara permanen?")) return;
+        button.disabled = true;
+        try {
+          const { error } = await client
+            .from("wedding_comments")
+            .delete()
+            .eq("id", id);
+          if (error) throw error;
+          setStatus(commentsStatus, "Ucapan berhasil dihapus.");
+          await loadComments();
+        } catch (error) {
+          button.disabled = false;
+          setStatus(commentsStatus, "Ucapan gagal dihapus. Pastikan akun ini memiliki akses admin.", true);
+          console.error("Gagal menghapus ucapan.", error);
+        }
+      }
+
+      async function enterAdmin(user) {
+        const { data, error } = await client
+          .from("wedding_admins")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) {
+          console.error("Gagal memeriksa hak akses admin.", error);
+          await client.auth.signOut();
+          showLogin("Hak akses admin gagal diverifikasi. Periksa kebijakan Supabase.");
+          return;
+        }
+        if (!data) {
+          await client.auth.signOut();
+          showLogin("Akun ini belum terdaftar sebagai admin.");
+          return;
+        }
+        loginPanel.hidden = true;
+        adminPanel.hidden = false;
+        await loadComments();
+      }
+
+      document.querySelector("#login-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = document.querySelector("#login-button");
+        button.disabled = true;
+        setStatus(loginStatus, "Memeriksa akun…");
+        try {
+          const { data, error } = await client.auth.signInWithPassword({
+            email: document.querySelector("#email").value.trim(),
+            password: document.querySelector("#password").value
+          });
+          if (error) throw error;
+          await enterAdmin(data.user);
+        } catch (error) {
+          setStatus(loginStatus, "Login gagal. Periksa email, kata sandi, dan pengaturan Supabase Auth.", true);
+          console.error("Login admin gagal.", error);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.querySelector("#invite-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const names = document.querySelector("#invite-names").value
+          .split(",")
+          .map((name) => name.trim().replace(/\s+/g, " "))
+          .filter(Boolean);
+        if (names.length < 1 || names.length > 2) {
+          setStatus(document.querySelector("#invite-status"), "Isi satu nama atau maksimal dua nama, dipisahkan dengan koma.", true);
+          return;
+        }
+        const inviteUrl = new URL("index.html", window.location.href);
+        inviteUrl.searchParams.set("to", names.join(","));
+        document.querySelector("#invite-link").value = inviteUrl.href;
+        document.querySelector("#invite-output").hidden = false;
+        setStatus(document.querySelector("#invite-status"), "Link undangan berhasil dibuat.");
+      });
+
+      document.querySelector("#copy-invite-link").addEventListener("click", async () => {
+        const link = document.querySelector("#invite-link");
+        try {
+          await navigator.clipboard.writeText(link.value);
+          setStatus(document.querySelector("#invite-status"), "Link berhasil disalin.");
+        } catch (error) {
+          link.select();
+          setStatus(document.querySelector("#invite-status"), "Link siap disalin secara manual.");
+          console.error("Clipboard tidak tersedia untuk halaman ini.", error);
+        }
+      });
+
+      document.querySelector("#refresh-comments").addEventListener("click", loadComments);
+      document.querySelector("#logout-button").addEventListener("click", async () => {
+        const { error } = await client.auth.signOut();
+        if (error) {
+          setStatus(commentsStatus, "Gagal keluar. Coba kembali.", true);
+          console.error("Logout admin gagal.", error);
+          return;
+        }
+        commentList.replaceChildren();
+        showLogin("Anda sudah keluar dari admin.");
+      });
+
+      client.auth.getSession().then(({ data, error }) => {
+        if (error) {
+          console.error("Sesi admin tidak dapat dibaca.", error);
+          showLogin("Sesi login tidak dapat diperiksa. Silakan masuk kembali.");
+          return;
+        }
+        if (data.session) enterAdmin(data.session.user);
+        else showLogin();
+      }).catch((error) => {
+        console.error("Sesi admin tidak dapat dibaca.", error);
+        showLogin("Sesi login tidak dapat diperiksa. Silakan masuk kembali.");
+      });
+    })();
+  </script>
+</body>
+</html>

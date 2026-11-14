@@ -4,116 +4,66 @@ const cover = document.querySelector("#sampul");
     const invitation = document.querySelector("#invitation");
     const musicButton = document.querySelector("#music-button");
     const musicLabel = document.querySelector("#music-label");
+    const weddingMusic = new Audio("audio/wedding-violin.mp3");
+    weddingMusic.loop = true;
+    weddingMusic.preload = "none";
+    const galleryLightbox = document.querySelector("#gallery-lightbox");
+    const lightboxImage = document.querySelector(".lightbox-image");
+    const guestNameFirst = document.querySelector("#guest-name-first");
+    const guestNameConjunction = document.querySelector("#guest-name-conjunction");
+    const guestNameSecond = document.querySelector("#guest-name-second");
     const commentsContainer = document.querySelector("#comments");
     const formStatus = document.querySelector("#form-status");
-    const commentsStorageKey = "riko-eva-wedding-comments-v1";
-    let audioContext;
-    let musicTimer;
-    let masterGain;
-    let violinWave;
+    const locationSegments = window.location.pathname.split("/");
+    const indexPathIndex = locationSegments.findIndex((segment) => segment.toLowerCase() === "index.html");
+    const pathGuestName = indexPathIndex < 0
+      ? ""
+      : locationSegments.slice(indexPathIndex + 1).filter(Boolean).join(" ");
+    const urlParameters = new URLSearchParams(window.location.search);
+    const queryGuestName = urlParameters.get("to") || urlParameters.get("guest") || "";
+    let decodedPathGuestName = "";
+    if (pathGuestName) {
+      try {
+        decodedPathGuestName = decodeURIComponent(pathGuestName.replace(/\+/g, " "));
+      } catch {
+        decodedPathGuestName = pathGuestName.replace(/%/g, " ");
+      }
+    }
+    const guestNames = (queryGuestName || decodedPathGuestName)
+      .split(",")
+      .map((name) => name.trim().replace(/\s+/g, " "))
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((name) => name.slice(0, 120));
+    if (guestNames.length > 0) {
+      guestNameFirst.textContent = guestNames[0];
+      guestNameSecond.textContent = guestNames[1] || "";
+      guestNameSecond.hidden = guestNames.length < 2;
+      guestNameConjunction.hidden = guestNames.length < 2;
+    }
+    const supabaseConfig = window.weddingSupabaseConfig;
+    let supabaseClient = null;
+    if (
+      supabaseConfig &&
+      /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseConfig.url) &&
+      typeof supabaseConfig.anonKey === "string" &&
+      supabaseConfig.anonKey.length > 20 &&
+      window.supabase?.createClient
+    ) {
+      supabaseClient = window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
+    }
     let savedComments = [];
-    let commentsStorageAvailable = true;
-
-    function playViolinNote(frequency, startTime, duration, volume) {
-      const oscillator = audioContext.createOscillator();
-      const filter = audioContext.createBiquadFilter();
-      const gain = audioContext.createGain();
-      const vibrato = audioContext.createOscillator();
-      const vibratoDepth = audioContext.createGain();
-
-      oscillator.setPeriodicWave(violinWave);
-      oscillator.frequency.setValueAtTime(frequency, startTime);
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(3600, startTime);
-      filter.Q.setValueAtTime(1.1, startTime);
-      gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.34);
-      gain.gain.setValueAtTime(volume, startTime + duration * 0.78);
-      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration + 0.55);
-      vibrato.type = "sine";
-      vibrato.frequency.setValueAtTime(5.4, startTime + 0.25);
-      vibratoDepth.gain.setValueAtTime(0, startTime);
-      vibratoDepth.gain.linearRampToValueAtTime(5, startTime + 0.9);
-      vibrato.connect(vibratoDepth);
-      vibratoDepth.connect(oscillator.frequency);
-      oscillator.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
-      oscillator.start(startTime);
-      vibrato.start(startTime + 0.25);
-      oscillator.stop(startTime + duration + 0.62);
-      vibrato.stop(startTime + duration + 0.62);
-    }
-
-    function scheduleMusic() {
-      const melody = [
-        { frequency: 587.33, duration: 4.4, gap: 3.8 },
-        { frequency: 659.25, duration: 3.2, gap: 2.8 },
-        { frequency: 739.99, duration: 4.2, gap: 3.6 },
-        { frequency: 880.00, duration: 5.0, gap: 4.1 },
-        { frequency: 830.61, duration: 3.6, gap: 3.1 },
-        { frequency: 739.99, duration: 4.5, gap: 3.7 },
-        { frequency: 659.25, duration: 3.4, gap: 2.9 },
-        { frequency: 587.33, duration: 5.2, gap: 4.2 },
-        { frequency: 493.88, duration: 3.5, gap: 3.0 },
-        { frequency: 587.33, duration: 4.3, gap: 3.6 },
-        { frequency: 659.25, duration: 5.0, gap: 4.1 },
-        { frequency: 587.33, duration: 6.0, gap: 5.4 }
-      ];
-      const harmonies = [
-        { start: 0, notes: [293.66, 369.99, 440.00] },
-        { start: 9.5, notes: [246.94, 293.66, 369.99] },
-        { start: 19, notes: [196.00, 246.94, 293.66] },
-        { start: 28.5, notes: [220.00, 277.18, 329.63] },
-        { start: 38, notes: [293.66, 369.99, 440.00] }
-      ];
-      let offset = 0;
-      const start = audioContext.currentTime + 0.12;
-
-      melody.forEach((note) => {
-        playViolinNote(note.frequency, start + offset, note.duration, 0.075);
-        offset += note.gap;
-      });
-
-      harmonies.forEach((chord) => {
-        chord.notes.forEach((frequency, index) => {
-          playViolinNote(frequency, start + chord.start + index * 0.09, 8.4, 0.018);
-        });
-      });
-
-      return offset + 2;
-    }
+    let commentsStorageAvailable = Boolean(supabaseClient);
 
     async function startMusic() {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) {
-        musicLabel.textContent = "Violin tidak tersedia";
-        return;
-      }
-      if (!audioContext) {
-        audioContext = new AudioContextClass();
-        const partials = new Float32Array([0, 1, 0.62, 0.42, 0.29, 0.2, 0.13, 0.08, 0.04]);
-        const harmonics = new Float32Array(partials.length);
-        violinWave = audioContext.createPeriodicWave(partials, harmonics);
-        masterGain = audioContext.createGain();
-        masterGain.gain.value = 0.72;
-        masterGain.connect(audioContext.destination);
-      }
-      await audioContext.resume();
-      if (musicTimer) return;
-      const phraseDuration = scheduleMusic();
-      musicTimer = window.setInterval(scheduleMusic, phraseDuration * 1000);
+      await weddingMusic.play();
       musicButton.classList.add("playing");
       musicButton.setAttribute("aria-pressed", "true");
       musicLabel.textContent = "Jeda violin";
     }
 
-    async function stopMusic() {
-      if (musicTimer) {
-        window.clearInterval(musicTimer);
-        musicTimer = undefined;
-      }
-      if (audioContext) await audioContext.suspend();
+    function stopMusic() {
+      weddingMusic.pause();
       musicButton.classList.remove("playing");
       musicButton.setAttribute("aria-pressed", "false");
       musicLabel.textContent = "Putar violin";
@@ -137,8 +87,11 @@ const cover = document.querySelector("#sampul");
     });
 
     musicButton.addEventListener("click", () => {
-      if (musicTimer) stopMusic();
-      else startMusic();
+      if (!weddingMusic.paused) stopMusic();
+      else startMusic().catch((error) => {
+        musicLabel.textContent = "Musik gagal diputar";
+        console.error("Musik violin tidak dapat diputar.", error);
+      });
     });
 
     const menuButton = document.querySelector("#menu-button");
@@ -158,6 +111,34 @@ const cover = document.querySelector("#sampul");
       });
     });
 
+    document.querySelectorAll(".gallery-photo").forEach((photo) => {
+      photo.addEventListener("click", () => {
+        const image = photo.querySelector("img");
+        lightboxImage.src = image.currentSrc || image.src;
+        lightboxImage.alt = image.alt;
+        galleryLightbox.showModal();
+      });
+    });
+
+    document.querySelector(".lightbox-close").addEventListener("click", () => {
+      galleryLightbox.close();
+    });
+
+    galleryLightbox.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        galleryLightbox.close();
+      }
+    });
+
+    galleryLightbox.addEventListener("click", (event) => {
+      if (event.target === galleryLightbox) galleryLightbox.close();
+    });
+
+    galleryLightbox.addEventListener("close", () => {
+      lightboxImage.removeAttribute("src");
+    });
+
     function renderComments() {
       commentsContainer.replaceChildren();
       savedComments.forEach((entry) => {
@@ -169,11 +150,19 @@ const cover = document.querySelector("#sampul");
         card.className = "comment-entry";
         name.className = "comment-name";
         name.textContent = entry.name;
+        if (entry.attendance === "hadir" || entry.attendance === "tidak-hadir") {
+          const attendance = document.createElement("span");
+          attendance.className = "comment-attendance";
+          attendance.textContent = entry.attendance === "hadir"
+            ? "Insyaallah hadir"
+            : "Mohon maaf, tidak hadir";
+          card.append(attendance);
+        }
         message.className = "comment-text";
         message.textContent = entry.comment;
         date.className = "comment-date";
-        date.dateTime = entry.createdAt;
-        date.textContent = new Date(entry.createdAt).toLocaleString("id-ID", {
+        date.dateTime = entry.created_at;
+        date.textContent = new Date(entry.created_at).toLocaleString("id-ID", {
           dateStyle: "medium",
           timeStyle: "short"
         });
@@ -182,59 +171,66 @@ const cover = document.querySelector("#sampul");
       });
     }
 
-    function loadComments() {
+    async function loadComments() {
+      if (!supabaseClient) {
+        commentsStorageAvailable = false;
+        formStatus.classList.add("error");
+        formStatus.textContent = "Buku tamu belum terhubung. Admin perlu mengatur koneksi Supabase terlebih dahulu.";
+        console.error("Supabase belum dikonfigurasi untuk buku tamu.");
+        return;
+      }
+
       try {
-        const stored = window.localStorage.getItem(commentsStorageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (!Array.isArray(parsed) || parsed.some((entry) =>
-            !entry || typeof entry.name !== "string" ||
-            typeof entry.comment !== "string" ||
-            typeof entry.createdAt !== "string"
-          )) {
-            throw new Error("Format ucapan tersimpan tidak valid.");
-          }
-          savedComments = parsed;
-        }
+        const { data, error } = await supabaseClient
+          .from("wedding_comments")
+          .select("id, name, comment, attendance, created_at")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        savedComments = data;
+        commentsStorageAvailable = true;
         renderComments();
       } catch (error) {
         commentsStorageAvailable = false;
         formStatus.classList.add("error");
-        formStatus.textContent = "Ucapan tersimpan tidak dapat dibaca di browser ini.";
+        formStatus.textContent = "Ucapan belum dapat dimuat. Silakan coba beberapa saat lagi.";
         console.error("Gagal membaca ucapan tersimpan.", error);
       }
     }
 
-    document.querySelector("#rsvp-form").addEventListener("submit", (event) => {
+    document.querySelector("#rsvp-form").addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!commentsStorageAvailable) {
+      const form = event.currentTarget;
+      if (!commentsStorageAvailable || !supabaseClient) {
         formStatus.classList.add("error");
-        formStatus.textContent = "Ucapan tidak dapat disimpan. Periksa penyimpanan browser Anda.";
+        formStatus.textContent = "Ucapan tidak dapat dikirim. Pastikan koneksi buku tamu tersedia.";
         return;
       }
       const guestName = document.querySelector("#guest").value.trim();
       const comment = document.querySelector("#comment").value.trim();
-      if (!guestName || !comment) return;
+      const attendance = document.querySelector('input[name="attendance"]:checked')?.value;
+      if (!guestName || !comment || !attendance) return;
 
-      const nextComments = [{
-        name: guestName,
-        comment,
-        createdAt: new Date().toISOString()
-      }, ...savedComments];
+      const submitButton = form.querySelector(".submit-button");
+      submitButton.disabled = true;
       try {
-        window.localStorage.setItem(commentsStorageKey, JSON.stringify(nextComments));
+        const { data, error } = await supabaseClient
+          .from("wedding_comments")
+          .insert({ name: guestName, comment, attendance })
+          .select("id, name, comment, attendance, created_at")
+          .single();
+        if (error) throw error;
+        savedComments = [data, ...savedComments];
+        renderComments();
+        formStatus.classList.remove("error");
+        formStatus.textContent = `Terima kasih, ${guestName}. Konfirmasi kehadiran dan ucapanmu sudah tersimpan.`;
+        form.reset();
       } catch (error) {
         formStatus.classList.add("error");
-        formStatus.textContent = "Ucapan gagal disimpan. Ruang penyimpanan browser mungkin penuh.";
+        formStatus.textContent = "Ucapan gagal dikirim. Silakan coba kembali.";
         console.error("Gagal menyimpan ucapan.", error);
-        return;
+      } finally {
+        submitButton.disabled = false;
       }
-
-      savedComments = nextComments;
-      renderComments();
-      formStatus.classList.remove("error");
-      formStatus.textContent = `Terima kasih, ${guestName}. Ucapanmu sudah tersimpan.`;
-      event.currentTarget.reset();
     });
 
     let previousScrollY = window.scrollY;
@@ -253,7 +249,7 @@ const cover = document.querySelector("#sampul");
         cover.classList.remove("opened");
         openButton.disabled = false;
         openButton.innerHTML = '<span aria-hidden="true">✦</span> Buka Undangan <span aria-hidden="true">✦</span>';
-        if (musicTimer) stopMusic();
+        if (!weddingMusic.paused) stopMusic();
       }
     }, { passive: true });
 
